@@ -1,5 +1,5 @@
-const API_BASE = "";
-const API_KEY = (import.meta.env.VITE_API_KEY as string) || "dev-local-key-change-me";
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || "https://ppe-guardian-607032555709.us-central1.run.app";
+const API_KEY = (import.meta.env.VITE_API_KEY as string) || "9c2b329732341cae324f35bc8ea4bc46e9e16daf54d611dc";
 
 export interface ComplianceEvent {
   id: number;
