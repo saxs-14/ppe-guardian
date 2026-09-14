@@ -1,7 +1,14 @@
 from fastapi.testclient import TestClient
 from app.main import app
+from app.config import settings
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-API-Key": settings.api_key})
+
+
+def test_protected_endpoint_rejects_missing_key():
+    anon = TestClient(app)
+    r = anon.get("/api/dashboard/summary")
+    assert r.status_code == 401
 
 
 def test_dashboard_summary_shape():

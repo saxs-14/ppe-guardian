@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = 100
     default_zone: str = "construction"
     zone_rules_json: str = '{"construction": ["helmet", "vest"], "mining": ["helmet"], "warehouse": ["vest"]}'
+    api_key: str = "dev-local-key-change-me"
 
     class Config:
         env_file = ".env"
