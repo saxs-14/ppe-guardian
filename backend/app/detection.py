@@ -1,15 +1,20 @@
 """
 Person detection: OpenCV DNN + MobileNet-SSD (same model family as SafeSpeed AI).
-PPE check: a colour/region heuristic, not a trained PPE-specific model - see
-README "Limitations". Within each detected person's bounding box:
-  - "helmet" region = top ~22% of the box (head area) -> checked for
-    high-visibility helmet colours (yellow/orange/white/red) in HSV space
+PPE check within each detected person's bounding box:
+  - "helmet" region = top ~22% of the box (head area) -> flagged present if
+    EITHER a colour heuristic (high-visibility yellow/orange/white/red in
+    HSV space) OR a trained MobileNetV2 helmet/no_helmet classifier (92.2%
+    held-out validation accuracy, trained on a public helmet dataset -
+    see README "Limitations" for its motorcycle-helmet domain-shift caveat)
+    says helmet. Alerting on either avoids the trained model's domain gap
+    making detection worse than the heuristic alone ever was.
   - "vest" region = ~25%-65% of the box height (torso area) -> checked for
-    high-visibility vest colours (yellow/orange/lime-green)
-A region is flagged present if the matching colour covers a large enough
-fraction of its pixels. This is a legitimate, working baseline detector -
-not a placeholder - but it is fooled by e.g. a yellow shirt or an orange
-background, and documented as such.
+    high-visibility vest colours (yellow/orange/lime-green). No real vest
+    dataset was found publicly downloadable, so vest detection stays
+    heuristic-only - see README "Limitations".
+This is a legitimate, working baseline detector - not a placeholder - but
+colour heuristics are fooled by e.g. a yellow shirt or an orange background,
+and documented as such.
 """
 import os
 from dataclasses import dataclass, field
@@ -17,6 +22,9 @@ from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
+import torch
+from PIL import Image
+from torchvision import transforms
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 PROTOTXT = os.path.join(MODEL_DIR, "MobileNetSSD_deploy.prototxt")
@@ -39,6 +47,19 @@ VEST_HSV_RANGES = [
     ((35, 80, 100), (85, 255, 255)),    # hi-vis lime/green
     ((5, 120, 120), (18, 255, 255)),    # hi-vis orange
 ]
+
+_HELMET_MODEL_PATH = os.path.join(os.path.dirname(__file__), "ml_model", "ppe_helmet_classifier.pt")
+_HELMET_MODEL_CLASSES = ["helmet", "no_helmet"]
+_HELMET_TRANSFORM = transforms.Compose(
+    [
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
+)
+
+_helmet_model = torch.jit.load(_HELMET_MODEL_PATH, map_location="cpu")
+_helmet_model.eval()
 
 _net = None
 
@@ -87,12 +108,23 @@ def _region_matches_colour(region, ranges, min_fraction=0.12) -> bool:
     return bool((mask > 0).mean() >= min_fraction)
 
 
+def _model_says_helmet(region: np.ndarray) -> bool:
+    if region.size == 0:
+        return False
+    rgb = cv2.cvtColor(region, cv2.COLOR_BGR2RGB)
+    tensor = _HELMET_TRANSFORM(Image.fromarray(rgb)).unsqueeze(0)
+    with torch.no_grad():
+        probs = torch.softmax(_helmet_model(tensor), dim=1)[0]
+    idx = int(torch.argmax(probs))
+    return _HELMET_MODEL_CLASSES[idx] == "helmet"
+
+
 def check_ppe(frame, box: Tuple[int, int, int, int]) -> Tuple[bool, bool]:
     x1, y1, x2, y2 = box
     height = y2 - y1
     helmet_region = frame[y1:y1 + int(height * 0.22), x1:x2]
     vest_region = frame[y1 + int(height * 0.25):y1 + int(height * 0.65), x1:x2]
-    helmet_ok = _region_matches_colour(helmet_region, HELMET_HSV_RANGES)
+    helmet_ok = _region_matches_colour(helmet_region, HELMET_HSV_RANGES) or _model_says_helmet(helmet_region)
     vest_ok = _region_matches_colour(vest_region, VEST_HSV_RANGES)
     return helmet_ok, vest_ok
 

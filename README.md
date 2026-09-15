@@ -28,22 +28,23 @@ CSV export for audits.
 ```text
 frontend (React/Vite/TS/Tailwind)  ->  backend (FastAPI)  ->  SQLite
                                               |
-                                     OpenCV DNN person detector
-                                     + colour-region PPE heuristic
+                       OpenCV DNN person detector -> colour heuristic (vest) +
+                       colour heuristic OR trained MobileNetV2 classifier (helmet)
 ```
 
 ## Technology stack
 
-Python, FastAPI, SQLAlchemy, SQLite, OpenCV (DNN module) on the backend; React,
-TypeScript, Vite, Tailwind CSS on the frontend. Same MobileNet-SSD detector as SafeSpeed
-AI — chosen to keep the MVP light (no PyTorch/CUDA dependency chain).
+Python, FastAPI, SQLAlchemy, SQLite, OpenCV (DNN module), PyTorch/TorchVision (helmet
+classifier) on the backend; React, TypeScript, Vite, Tailwind CSS on the frontend. Same
+MobileNet-SSD person detector as SafeSpeed AI.
 
 ## Folder structure
 
 ```text
 ppe-guardian/
 ├── backend/
-│   ├── app/          # FastAPI app, detection pipeline
+│   ├── app/
+│   │   └── ml_model/  # Trained TorchScript helmet classifier (ppe_helmet_classifier.pt)
 │   ├── models/        # MobileNet-SSD prototxt + caffemodel
 │   ├── demo/           # Bundled demo video
 │   └── tests/
@@ -118,11 +119,21 @@ local workplace-monitoring law.
 
 ## Limitations
 
-- **PPE detection is a colour heuristic (HSV thresholding in the head/torso region of each
-  detected person), not a PPE-specific trained model.** It will misfire on e.g. a yellow
-  shirt (false positive) or a helmet colour outside the configured ranges (false negative).
-  A production system should fine-tune a proper object detector (YOLO) on labeled PPE
-  images from the actual site cameras.
+- **Helmet detection combines a colour heuristic with a trained MobileNetV2 classifier**
+  (frozen ImageNet backbone + trained classifier head), fine-tuned on a public
+  helmet/no-helmet dataset (320 images), reaching **92.2% held-out validation accuracy**.
+  Helmet is flagged present if *either* signal fires. **The training dataset skews toward
+  motorcycle-helmet photos, not construction hard hats** — a real domain shift (the same
+  class of issue AgriVision hit, see that project's README) that hasn't been empirically
+  re-verified against this project's own construction-site demo images the way AgriVision's
+  was, so treat the model's real-world accuracy on hard hats as unverified, not equal to
+  92.2%.
+- **Vest detection is colour-heuristic only** — no real, publicly downloadable safety-vest
+  image dataset was found in the time available, so it has none of the above. It will
+  misfire on e.g. a yellow shirt (false positive) or a vest colour outside the configured
+  ranges (false negative). A production system should source a labeled vest dataset (or
+  collect one from the actual site cameras) and fine-tune a model the same way the helmet
+  classifier was.
 - Detector (MobileNet-SSD) is a lightweight 2017 model — best on eye-level/moderately
   elevated views; verified to work on the bundled demo clip.
 - No liveness/anti-tamper checks — a photo of a compliant worker held up to the camera
@@ -138,7 +149,10 @@ multi-site licensing.
 
 ## Future improvements
 
-- Replace the colour heuristic with a YOLO model fine-tuned on real PPE images
+- Source a real vest dataset and train a classifier, matching what's now done for helmets
+- Re-verify the helmet classifier against real construction-site photos (it was trained on
+  a motorcycle-helmet-skewed dataset) and retrain/fine-tune on-domain if accuracy drops
+- Move to a proper object detector (YOLO) fine-tuned on real PPE images for both classes
 - Add authentication/RBAC for the dashboard
 - Live RTSP ingestion instead of upload-only
 - Per-worker (not just per-frame) compliance history via badge/ID correlation, opt-in only
