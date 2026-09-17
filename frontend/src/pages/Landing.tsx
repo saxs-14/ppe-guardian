@@ -1,4 +1,12 @@
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
+
+const SITE_URL = "https://ppe-guardian-saxs-14s-projects.vercel.app";
+const TITLE = "PPE Guardian — Continuous PPE Compliance Monitoring";
+const DESCRIPTION =
+  "Camera footage in, compliance dashboard out. See who's missing a helmet or vest without walking the site.";
+
+const JSON_LD = {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "PPE Guardian", "applicationCategory": "BusinessApplication", "operatingSystem": "Web", "description": "Camera footage in, compliance dashboard out. See who's missing a helmet or vest without walking the site.", "url": "https://ppe-guardian-saxs-14s-projects.vercel.app", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}};
 
 const FEATURES = [
   { title: "Person detection", desc: "Detects each worker in frame via OpenCV DNN." },
@@ -12,6 +20,27 @@ const FEATURES = [
 export default function Landing() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      <Helmet>
+        <title>{TITLE}</title>
+        <meta name="description" content={DESCRIPTION} />
+        <link rel="canonical" href={SITE_URL + "/"} />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={TITLE} />
+        <meta property="og:description" content={DESCRIPTION} />
+        <meta property="og:url" content={SITE_URL + "/"} />
+        <meta property="og:image" content={SITE_URL + "/og-image.png"} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={TITLE} />
+        <meta name="twitter:description" content={DESCRIPTION} />
+        <meta name="twitter:image" content={SITE_URL + "/og-image.png"} />
+
+        <script type="application/ld+json">{JSON.stringify(JSON_LD)}</script>
+      </Helmet>
+
       <header className="flex items-center justify-between px-6 py-5 max-w-6xl mx-auto">
         <div className="flex items-center gap-2 font-semibold text-lg">
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
@@ -43,6 +72,7 @@ export default function Landing() {
         </section>
 
         <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 py-8">
+          <h2 className="sr-only">Features</h2>
           {FEATURES.map((f) => (
             <div key={f.title} className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
               <h3 className="font-semibold">{f.title}</h3>
