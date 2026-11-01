@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/assets/banner.svg" width="100%" alt="PPE Guardian banner"/></p>
+
 # PPE Guardian
 
 Computer-vision workplace safety MVP: checks whether people in camera footage are wearing
